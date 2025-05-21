@@ -1,0 +1,24 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: students-delete-deployment
+  labels:
+    app: students-delete
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: students-delete
+  template:
+    metadata:
+      labels:
+        app: students-delete
+    spec:
+      containers:
+        - name: students-delete
+          image: hamiltonlg/students-delete-service:sha-8980ea3
+          ports:
+            - containerPort: 8080
+          env:
+            - name: MONGO_URI
+              value: mongodb://mongo-service:27017
