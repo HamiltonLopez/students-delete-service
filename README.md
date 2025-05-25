@@ -1,165 +1,194 @@
 # Students Delete Service
 
-Servicio responsable de eliminar estudiantes del sistema.
-
-## Funcionalidad
-
-Este servicio expone un endpoint DELETE que permite eliminar un estudiante específico utilizando su identificador único.
-
-## Especificaciones Técnicas
-
-- **Puerto**: 8085 (interno), 30085 (NodePort)
-- **Endpoint**: DELETE `/students/{id}`
-- **Runtime**: Go
-- **Base de Datos**: MongoDB
+Este servicio es parte del sistema de gestión de estudiantes y se encarga de eliminar registros de estudiantes existentes.
 
 ## Estructura del Servicio
 
 ```
 students-delete-service/
-├── k8s/
+├── controllers/     # Controladores REST
+├── models/         # Modelos de datos
+├── repositories/   # Capa de acceso a datos
+├── services/      # Lógica de negocio
+├── k8s/           # Configuraciones de Kubernetes
 │   ├── deployment.yaml
-│   └── service.yaml
-├── src/
-│   ├── main.go
-│   ├── handlers/
-│   ├── models/
-│   └── config/
-├── Dockerfile
-└── README.md
+│   ├── service.yaml
+│   └── ingress.yaml
+└── test/          # Scripts de prueba
+    └── test-delete.sh
 ```
 
-## API Endpoint
+## Endpoints
 
-### DELETE /students/{id}
+### DELETE /delete/{id}
+Elimina un estudiante existente del sistema.
 
-Elimina un estudiante específico del sistema.
+**Parámetros de URL:**
+- `id`: ID del estudiante (ObjectId)
 
-#### URL Parameters
-- `id`: ID único del estudiante (requerido)
-
-#### Response (Success - 204 No Content)
-```json
-{}
-```
-
-#### Error Response (404 Not Found)
+**Response (200 OK):**
 ```json
 {
-    "error": "string",
-    "message": "string"
+    "message": "Student deleted successfully"
+}
+```
+
+**Response (404 Not Found):**
+```json
+{
+    "error": "Student not found"
 }
 ```
 
 ## Configuración Kubernetes
 
 ### Deployment
-- **Replicas**: 3
-- **Imagen**: hamiltonlg/students-delete-service:latest
-- **Variables de Entorno**:
-  - MONGO_URI: mongodb://mongo-service:27017
+El servicio se despliega con las siguientes especificaciones:
+- Replicas: 1
+- Puerto: 8080
+- Imagen: students-delete-service:latest
 
 ### Service
-- **Tipo**: NodePort
-- **Puerto**: 8085 -> 30085
+- Tipo: NodePort
+- Puerto: 8080
+- NodePort: 30085
 
-## Despliegue
+### Ingress
+- Path: /delete
+- Servicio: students-delete-service
+- Puerto: 8080
 
+## Despliegue en Kubernetes
+
+### 1. Aplicar configuraciones
 ```bash
-kubectl apply -f k8s/
+# Crear el deployment
+kubectl apply -f k8s/deployment.yaml
+
+# Crear el service
+kubectl apply -f k8s/service.yaml
+
+# Crear el ingress
+kubectl apply -f k8s/ingress.yaml
 ```
 
-## Verificación
-
-1. Verificar el deployment:
+### 2. Verificar el despliegue
 ```bash
+# Verificar el deployment
 kubectl get deployment students-delete-deployment
-```
+kubectl describe deployment students-delete-deployment
 
-2. Verificar los pods:
-```bash
+# Verificar los pods
 kubectl get pods -l app=students-delete
+kubectl describe pod -l app=students-delete
+
+# Verificar el service
+kubectl get svc students-delete-service
+kubectl describe svc students-delete-service
+
+# Verificar el ingress
+kubectl get ingress students-delete-ingress
+kubectl describe ingress students-delete-ingress
 ```
 
-3. Verificar el servicio:
+### 3. Verificar logs
 ```bash
-kubectl get svc students-delete-service
+# Ver logs de los pods
+kubectl logs -l app=students-delete
+```
+
+### 4. Escalar el servicio
+```bash
+# Escalar a más réplicas si es necesario
+kubectl scale deployment students-delete-deployment --replicas=3
+```
+
+### 5. Actualizar el servicio
+```bash
+# Actualizar la imagen del servicio
+kubectl set image deployment/students-delete-deployment students-delete=students-delete-service:nueva-version
+```
+
+### 6. Eliminar recursos
+```bash
+# Si necesitas eliminar los recursos
+kubectl delete -f k8s/ingress.yaml
+kubectl delete -f k8s/service.yaml
+kubectl delete -f k8s/deployment.yaml
 ```
 
 ## Pruebas
 
-### Eliminar un estudiante
+El servicio incluye un script de pruebas automatizadas (`test/test-delete.sh`) que verifica:
+
+1. Eliminación exitosa de un estudiante
+2. Manejo de ID inexistente
+3. Manejo de ID inválido
+4. Verificación de idempotencia
+
+Para ejecutar las pruebas:
 ```bash
-curl -X DELETE http://localhost:30085/students/12345
+./test/test-delete.sh
 ```
 
-## Logs
-
-Ver logs de un pod específico:
+También se puede ejecutar como parte de la suite completa de pruebas:
 ```bash
-kubectl logs -f <pod-name>
+./test-all-services.sh
 ```
 
-## Monitoreo
+### Casos de Prueba
 
-### Métricas Importantes
-- Tiempo de respuesta del endpoint
-- Tasa de éxito/error en eliminaciones
-- Uso de recursos (CPU/Memoria)
-- Latencia de operaciones en MongoDB
+1. **Test 1:** Eliminar estudiante existente
+   - Crea un estudiante de prueba
+   - Elimina el estudiante
+   - Verifica que fue eliminado correctamente
 
-## Solución de Problemas
+2. **Test 2:** Intentar eliminar estudiante inexistente
+   - Usa un ID válido pero inexistente
+   - Verifica el mensaje de error apropiado
 
-1. **Error de Conexión a MongoDB**:
-   - Verificar la variable MONGO_URI
-   - Comprobar conectividad con mongo-service
-   - Revisar logs de MongoDB
+3. **Test 3:** Probar con ID inválido
+   - Usa un formato de ID incorrecto
+   - Verifica el manejo de error
 
-2. **Estudiante No Encontrado**:
-   - Verificar el formato del ID
-   - Comprobar existencia en la base de datos
-   - Revisar logs de la aplicación
+4. **Test 4:** Verificar idempotencia
+   - Intenta eliminar un estudiante ya eliminado
+   - Verifica que la operación es idempotente
 
-3. **Pod en CrashLoopBackOff**:
-   - Verificar logs del pod
-   - Comprobar recursos asignados
-   - Verificar configuración del deployment
+## Variables de Entorno
 
-4. **Servicio no accesible**:
-   - Verificar el estado del service
-   - Comprobar la configuración de NodePort
-   - Verificar reglas de firewall
+- `MONGODB_URI`: URI de conexión a MongoDB (default: "mongodb://mongo-service:27017")
+- `DATABASE_NAME`: Nombre de la base de datos (default: "studentsdb")
+- `COLLECTION_NAME`: Nombre de la colección (default: "students")
 
-## Optimización
+## Dependencias
 
-1. **Validación**:
-   - Implementar validación robusta de IDs
-   - Verificar permisos de eliminación
-   - Manejar casos especiales
-
-2. **Transacciones**:
-   - Implementar eliminación atómica
-   - Manejar rollbacks en caso de error
-   - Asegurar consistencia de datos
-
-3. **Auditoría**:
-   - Registrar eliminaciones realizadas
-   - Mantener historial de operaciones
-   - Implementar soft delete (opcional)
+- Go 1.19+
+- MongoDB
+- Kubernetes 1.19+
+- Ingress NGINX Controller
 
 ## Consideraciones de Seguridad
 
-1. **Autorización**:
-   - Verificar permisos antes de eliminar
-   - Implementar autenticación si es necesario
-   - Registrar quién realiza la eliminación
+1. Validación de formato de ID
+2. Verificación de permisos
+3. Manejo seguro de errores
+4. Registro de operaciones de eliminación
+5. Confirmación de eliminación
 
-2. **Validación**:
-   - Verificar formato de ID
-   - Prevenir eliminaciones masivas no autorizadas
-   - Implementar rate limiting
+## Monitoreo y Logs
 
-3. **Recuperación**:
-   - Considerar implementar papelera de reciclaje
-   - Mantener backups de datos eliminados
-   - Procedimiento de recuperación de datos 
+- Endpoint de health check: `/health`
+- Logs en formato JSON
+- Métricas de rendimiento:
+  - Tiempo de respuesta
+  - Tasa de éxito/error en eliminaciones
+  - Número de eliminaciones por período
+
+## Solución de Problemas
+
+1. Verificar la conexión con MongoDB
+2. Comprobar los logs del pod
+3. Validar la configuración del Ingress
+4. Verificar el estado del servicio en Kubernetes
+5. Revisar el formato de los IDs en las peticiones 
